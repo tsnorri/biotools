@@ -8,6 +8,10 @@ from Bio import SeqIO
 import sys
 
 
+def tr_rec_id(rec_id):
+	return rec_id.translate(str.maketrans("*:/", "_--"))
+
+
 def output_vcf_record(vcf, chrom, pos, rec_idx, ref, alt_ids, alt_seqs_by_id_):
 	assert 0 < len(ref)
 	
@@ -84,7 +88,11 @@ sequences = []
 rec_ids = []
 for record in SeqIO.parse(sys.stdin, "fasta"):
 	sequences.append(record)
-	rec_ids.append(record.id)
+	rec_id = record.id
+
+	# Translate characters for use in file names (though some of these might be allowed by the FS).
+	rec_id = tr_rec_id(rec_id)
+	rec_ids.append(rec_id)
 
 # Output VCF header.
 vcf.write("##fileformat=VCFv4.2\n")
@@ -143,7 +151,7 @@ for i, rc in enumerate(ref):
 	it = iter(sequences)
 	next(it) # Skip the reference.
 	for record in it:
-		rec_id = record.id
+		rec_id = tr_rec_id(record.id)
 		ac = record.seq[i]
 		seq = None
 		if ac != rc:
