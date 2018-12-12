@@ -24,10 +24,10 @@ def handle_alts(rec):
 if __name__ == "__main__":
 	# Parse the command line arguments.
 	parser = argparse.ArgumentParser(description = "Mangle insertions and MNVs in a variant file.")
-	parser.add_argument('--input-vcf', type = argparse.FileType('r'), required = True)
-	parser.add_argument('--output-vcf', type = argparse.FileType('w'), required = True)
-	parser.add_argument('--chr', type = str, required = False, default = None)
-	parser.add_argument('--random-seed', type = int, required = False, default = 0)
+	parser.add_argument('--input-vcf', type = argparse.FileType('r'), required = True, help = "Input VCF")
+	parser.add_argument('--output-vcf', type = argparse.FileType('w'), required = True, help = "Output VCF")
+	parser.add_argument('--chr', type = str, required = False, default = None, help = "Filter by chromosome")
+	parser.add_argument('--random-seed', type = int, required = False, default = 0, help = "Random seed")
 	args = parser.parse_args()
 	
 	# Set up the RNG.
