@@ -38,3 +38,5 @@ if __name__ == "__main__":
 	for rec in vcf_reader:
 		if handle_alts(rec):
 			vcf_writer.write_record(rec)
+		else:
+			print("Skipping variant at position %d…" % rec.POS, file = sys.stderr)
