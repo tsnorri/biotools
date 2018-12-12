@@ -9,17 +9,30 @@ import sys
 import vcf
 
 
+def check_alleles(rec, idx):
+	new_allele = rec.alleles[idx]
+	if rec.alleles[0] == new_allele.sequence:
+		return True
+
+	for allele in rec.alleles[1:idx]:
+		if type(allele == vcf.model._Substitution):
+			if allele.sequence == new_allele.sequence:
+				return True
+	
+	return False
+
+
 def generate_sequence(length):
 	return ''.join(random.choice("ACGT") for _ in range(length))
 
 
 def handle_alts(rec):
-	for allele in rec.alleles[1:]:
+	for idx, allele in enumerate(rec.alleles[1:]):
 		if type(allele == vcf.model._Substitution):
 			length = len(allele.sequence)
 			allele.sequence = generate_sequence(length)
 			# Check that we didn’t get the original sequence.
-			while allele.sequence == rec.alleles[0]:
+			while check_alleles(rec, 1 + idx):
 				allele.sequence = generate_sequence(length)
 		elif type(allele == vcf.model._AltRecord and allele.type == 'DEL'):
 			pass
