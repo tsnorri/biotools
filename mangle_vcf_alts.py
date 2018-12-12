@@ -26,6 +26,7 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description = "Mangle insertions and MNVs in a variant file.")
 	parser.add_argument('--input-vcf', type = argparse.FileType('r'), required = True)
 	parser.add_argument('--output-vcf', type = argparse.FileType('w'), required = True)
+	parser.add_argument('--chr', type = str, required = False, default = None)
 	parser.add_argument('--random-seed', type = int, required = False, default = 0)
 	args = parser.parse_args()
 	
@@ -36,6 +37,9 @@ if __name__ == "__main__":
 	vcf_reader = vcf.Reader(args.input_vcf)
 	vcf_writer = vcf.Writer(args.output_vcf, template = vcf_reader)
 	for rec in vcf_reader:
+		if args.chr is not None and rec.CHROM is not args.chr:
+			continue
+		
 		if handle_alts(rec):
 			vcf_writer.write_record(rec)
 		else:
