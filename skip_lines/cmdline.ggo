@@ -1,0 +1,10 @@
+# Copyright (c) 2019 Tuukka Norri
+# This code is licensed under MIT license (see LICENSE for details).
+
+package	"skip_lines"
+version	"0.1"
+purpose	"Copy the input lines to output skipping the given (1-based) line numbers."
+usage	"skip_lines --lines ... < input"
+description	"The lines will be written to standard output."
+
+option	"lines"	-	"Skipped line numbers"	longlong	required	multiple
