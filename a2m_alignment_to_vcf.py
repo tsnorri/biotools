@@ -71,7 +71,7 @@ def handle_range(base_pos, chrom, sequences, seq_ids, rs, re, join_gt_by):
 	alt_idxs[ref_part_formatted] = 0
 
 	# CHROM POS ID REF ALT QUAL FILTER INFO FORMAT
-	print("%d\t%d\t.\t%s\t%s\t.\tPASS\t.\tGT\t%s" % (chrom, base_pos + rs, ref_part_formatted, ",".join(alts_in_order), join_gt_by.join([str(alt_idxs[alt]) for alt in alts])))
+	print("%s\t%d\t.\t%s\t%s\t.\tPASS\t.\tGT\t%s" % (chrom, base_pos + rs, ref_part_formatted, ",".join(alts_in_order), join_gt_by.join([str(alt_idxs[alt]) for alt in alts])))
 
 
 def find_seq_idxs(specific_types, seq_ids):
@@ -89,7 +89,7 @@ def find_seq_idxs(specific_types, seq_ids):
 
 parser = argparse.ArgumentParser(description = "Transform a multiple alignment in A2M format into variants. The first sequence needs to be the reference.")
 parser.add_argument('--input', type = argparse.FileType('r'), required = True, help = "Input MSA")
-parser.add_argument('--chr', type = int, required = True, help = "Chromosome number")
+parser.add_argument('--chr', type = str, required = True, help = "Chromosome identifier")
 parser.add_argument('--base-position', type = int, default = 0, help = "Base position to be added to the co-ordinates")
 parser.add_argument('--mangle-sample-names', action = 'store_true', help = "Replace unusual characters in sample names")
 parser.add_argument('--specific-type', nargs = '*', type = str, default = [], action = "store", help = "Instead of writing one haploid sample for each HLA type, output one haploid or diploid donor with the given HLA types.")
