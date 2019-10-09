@@ -5,6 +5,7 @@
 
 import argparse
 from Bio import SeqIO
+import itertools
 import sys
 
 
@@ -47,7 +48,7 @@ def format_sample_name(n):
 	return n.translate(str.maketrans("*:/", "_--"))
 
 
-def handle_range(base_pos, chrom, sequences, seq_ids, rs, re, join_gt_by):
+def handle_range(base_pos, gap_csum, chrom, sequences, seq_ids, rs, re, join_gt_by):
 	ref, *rest = sequences
 	ref_part = ref[rs:re]
 	ref_part_formatted = format_ref(ref_part)
@@ -71,7 +72,7 @@ def handle_range(base_pos, chrom, sequences, seq_ids, rs, re, join_gt_by):
 	alt_idxs[ref_part_formatted] = 0
 
 	# CHROM POS ID REF ALT QUAL FILTER INFO FORMAT
-	print("%s\t%d\t.\t%s\t%s\t.\tPASS\t.\tGT\t%s" % (chrom, base_pos + rs, ref_part_formatted, ",".join(alts_in_order), join_gt_by.join([str(alt_idxs[alt]) for alt in alts])))
+	print("%s\t%d\t.\t%s\t%s\t.\tPASS\t.\tGT\t%s" % (chrom, base_pos + rs - gap_csum[rs], ref_part_formatted, ",".join(alts_in_order), join_gt_by.join([str(alt_idxs[alt]) for alt in alts])))
 
 
 def find_seq_idxs(specific_types, seq_ids):
@@ -108,10 +109,13 @@ for s in sequences:
 		print("Found a gap character in the first column.", file = sys.stderr)
 		sys.exit(1)
 	
-# Make a bit vector of positions that are followed by a gap.
+# Make a boolean vector of positions that are followed by a gap.
 gap_follows = len(sequences[0]) * [False]
 for i, c in enumerate(sequences[0][1:]):
 	gap_follows[i] = ('-' == c)
+
+# Count the gaps up to each aligned position.
+gap_csum = list(itertools.accumulate(itertools.chain([0], gap_follows[:-1])))
 
 # Filter by --specific-type.
 join_gt_by = "\t"
@@ -141,5 +145,5 @@ for i, next_is_gap in enumerate(gap_follows):
 	if next_is_gap:
 		continue
 	
-	handle_range(args.base_position, args.chr, sequences, seq_ids, rs, re, join_gt_by)
+	handle_range(args.base_position, gap_csum, args.chr, sequences, seq_ids, rs, re, join_gt_by)
 	rs = re
