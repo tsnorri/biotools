@@ -74,17 +74,30 @@ def handle_range(base_pos, chrom, sequences, seq_ids, rs, re, join_gt_by):
 	print("%d\t%d\t.\t%s\t%s\t.\tPASS\t.\tGT\t%s" % (chrom, base_pos + rs, ref_part_formatted, ",".join(alts_in_order), join_gt_by.join([str(alt_idxs[alt]) for alt in alts])))
 
 
+def find_seq_idxs(specific_types, seq_ids):
+	# Return REF
+	yield 0
+
+	# Handle the given ids.
+	for seq_id in specific_types:
+		try:
+			yield 1 + seq_ids[1:].index(seq_id)
+		except ValueError:
+			print("Sequence with id %s not found." % seq_id, file = sys.stderr)
+			sys.exit(1)
+
+
 parser = argparse.ArgumentParser(description = "Transform a multiple alignment in A2M format into variants. The first sequence needs to be the reference.")
 parser.add_argument('--input', type = argparse.FileType('r'), required = True, help = "Input MSA")
 parser.add_argument('--chr', type = int, required = True, help = "Chromosome number")
 parser.add_argument('--base-position', type = int, default = 0, help = "Base position to be added to the co-ordinates")
 parser.add_argument('--mangle-sample-names', action = 'store_true', help = "Replace unusual characters in sample names")
-parser.add_argument('--specific-type', nargs = '*', type = str, default = [], action = "store", help = "Instead of writing one haploid sample for each HLA type, output one diploid donor with the given HLA types.")
+parser.add_argument('--specific-type', nargs = '*', type = str, default = [], action = "store", help = "Instead of writing one haploid sample for each HLA type, output one haploid or diploid donor with the given HLA types.")
 args = parser.parse_args()
 
-if len(args.specific_type) not in (0, 2):
+if 2 < len(args.specific_type):
 	print(len(args.specific_type))
-	print("Exactly zero or two --specific-type arguments needed.", file = sys.stderr)
+	print("At most two --specific-type arguments needed.", file = sys.stderr)
 	sys.exit(1)
 
 seq_ids, sequences = get_sequences(args.input)
@@ -104,20 +117,9 @@ for i, c in enumerate(sequences[0][1:]):
 join_gt_by = "\t"
 if 0 != len(args.specific_type):
 	join_gt_by = "|"
-	lhs_seq_idx = None
-	rhs_seq_idx = None
-	try:
-		lhs_seq_idx = 1 + seq_ids[1:].index(args.specific_type[0])
-	except ValueError:
-		print("Sequence with id %s not found." % args.specific_type[0], file = sys.stderr)
-		sys.exit(1)
-	try:
-		rhs_seq_idx = 1 + seq_ids[1:].index(args.specific_type[1])
-	except ValueError:
-		print("Sequence with id %s not found." % args.specific_type[1], file = sys.stderr)
-		sys.exit(1)
-	seq_ids = [seq_ids[0], seq_ids[lhs_seq_idx], seq_ids[rhs_seq_idx]]
-	sequences = [sequences[0], sequences[lhs_seq_idx], sequences[rhs_seq_idx]]
+	seq_idxs = list(find_seq_idxs(args.specific_type, seq_ids))
+	seq_ids = [seq_ids[idx] for idx in seq_idxs]
+	sequences = [sequences[idx] for idx in seq_idxs]
 
 # Output the VCF header.
 formatted_sample_names = None
