@@ -131,7 +131,7 @@ else:
 
 print("##fileformat=VCFv4.2")
 print('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">')
-print("CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s" % ("\t".join(formatted_sample_names) if 0 == len(args.specific_type) else "SAMPLE1"))
+print("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s" % ("\t".join(formatted_sample_names) if 0 == len(args.specific_type) else "SAMPLE1"))
 
 # Range start, end.
 rs = 0
