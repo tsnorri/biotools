@@ -93,6 +93,7 @@ parser.add_argument('--input', type = argparse.FileType('r'), required = True, h
 parser.add_argument('--chr', type = str, required = True, help = "Chromosome identifier")
 parser.add_argument('--base-position', type = int, default = 0, help = "Base position to be added to the co-ordinates")
 parser.add_argument('--mangle-sample-names', action = 'store_true', help = "Replace unusual characters in sample names")
+parser.add_argument('--no-dels', action = 'store_true', help = "Do not use the <DEL> structural variant")
 parser.add_argument('--specific-type', nargs = '*', type = str, default = [], action = "store", help = "Instead of writing one haploid sample for each HLA type, output one haploid or diploid donor with the given HLA types.")
 args = parser.parse_args()
 
@@ -125,6 +126,16 @@ if 0 != len(args.specific_type):
 	seq_ids = [seq_ids[idx] for idx in seq_idxs]
 	sequences = [sequences[idx] for idx in seq_idxs]
 
+# Make a boolean vector of positions that are followed by a gap in any sequence.
+gap_follows_in_any = None
+if args.no_dels:
+	gap_follows_in_any = len(sequences[0]) * [False]
+	for i in range(len(sequences[0]) - 1):
+		for s in sequences:
+			if '-' == s[1 + i]:
+				gap_follows_in_any[i] = True
+				break
+
 # Output the VCF header.
 formatted_sample_names = None
 if args.mangle_sample_names:
@@ -135,13 +146,14 @@ else:
 
 print("##fileformat=VCFv4.2")
 print('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">')
-print('##ALT=<ID=DEL,Description="Deletion">')
+if not args.no_dels:
+	print('##ALT=<ID=DEL,Description="Deletion">')
 print("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s" % ("\t".join(formatted_sample_names) if 0 == len(args.specific_type) else "SAMPLE1"))
 
 # Range start, end.
 rs = 0
 re = 0
-for i, next_is_gap in enumerate(gap_follows):
+for i, next_is_gap in enumerate(gap_follows_in_any if args.no_dels else gap_follows):
 	re = i + 1
 	if next_is_gap:
 		continue
