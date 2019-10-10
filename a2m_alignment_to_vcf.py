@@ -94,12 +94,11 @@ parser.add_argument('--chr', type = str, required = True, help = "Chromosome ide
 parser.add_argument('--base-position', type = int, default = 0, help = "Base position to be added to the co-ordinates")
 parser.add_argument('--mangle-sample-names', action = 'store_true', help = "Replace unusual characters in sample names")
 parser.add_argument('--no-dels', action = 'store_true', help = "Do not use the <DEL> structural variant")
-parser.add_argument('--specific-type', nargs = '*', type = str, default = [], action = "store", help = "Instead of writing one haploid sample for each HLA type, output one haploid or diploid donor with the given HLA types.")
+parser.add_argument('--specific-types', nargs = '*', type = str, default = [], action = "store", help = "Instead of writing one haploid sample for each HLA type, output one haploid or diploid donor with the given HLA types.")
 args = parser.parse_args()
 
-if 2 < len(args.specific_type):
-	print(len(args.specific_type))
-	print("At most two --specific-type arguments needed.", file = sys.stderr)
+if 2 < len(args.specific_types):
+	print("At most two --specific-types arguments needed.", file = sys.stderr)
 	sys.exit(1)
 
 seq_ids, sequences = get_sequences(args.input)
@@ -118,11 +117,11 @@ for i, c in enumerate(sequences[0][1:]):
 # Count the gaps up to each aligned position.
 gap_csum = list(itertools.accumulate(itertools.chain([0], gap_follows[:-1])))
 
-# Filter by --specific-type.
+# Filter by --specific-types.
 join_gt_by = "\t"
-if 0 != len(args.specific_type):
+if 0 != len(args.specific_types):
 	join_gt_by = "|"
-	seq_idxs = list(find_seq_idxs(args.specific_type, seq_ids))
+	seq_idxs = list(find_seq_idxs(args.specific_types, seq_ids))
 	seq_ids = [seq_ids[idx] for idx in seq_idxs]
 	sequences = [sequences[idx] for idx in seq_idxs]
 
@@ -148,7 +147,7 @@ print("##fileformat=VCFv4.2")
 print('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">')
 if not args.no_dels:
 	print('##ALT=<ID=DEL,Description="Deletion">')
-print("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s" % ("\t".join(formatted_sample_names) if 0 == len(args.specific_type) else "SAMPLE1"))
+print("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s" % ("\t".join(formatted_sample_names) if 0 == len(args.specific_types) else "SAMPLE1"))
 
 # Range start, end.
 rs = 0
