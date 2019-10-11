@@ -114,6 +114,7 @@ int main(int argc, char **argv)
 				std::size_t i(sd.seq.size());
 				for (auto const c : listed_seq)
 				{
+					// See https://www.ebi.ac.uk/ipd/imgt/hla/nomenclature/alignments.html for a brief documentation.
 					switch (c)
 					{
 						case ' ':
@@ -129,12 +130,14 @@ int main(int argc, char **argv)
 							++sd.length;
 							break;
 							
+						// Identity to the reference sequence.
 						case '-':
 							always_assert(!is_first);
 							sd.seq.append(1, (*first_seq)[i]);
 							++sd.length;
 							break;
 							
+						// Insertion or deletion.
 						case '.':
 							sd.seq.append(1, '-');
 							break;
