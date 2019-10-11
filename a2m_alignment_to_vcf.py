@@ -75,13 +75,13 @@ def handle_range(base_pos, gap_csum, chrom, sequences, seq_ids, rs, re, join_gt_
 	print("%s\t%d\t.\t%s\t%s\t.\tPASS\t.\tGT\t%s" % (chrom, base_pos + rs - gap_csum[rs], ref_part_formatted, ",".join(alts_in_order), join_gt_by.join([str(alt_idxs[alt]) for alt in alts])))
 
 
-def find_seq_idxs(specific_types, seq_ids, include_first):
+def find_seq_idxs(specific_sequences, seq_ids, include_first):
 	if include_first:
 		# Return REF
 		yield 0
 
 	# Handle the given ids.
-	for seq_id in specific_types:
+	for seq_id in specific_sequences:
 		try:
 			yield 1 + seq_ids[1:].index(seq_id)
 		except ValueError:
@@ -95,11 +95,11 @@ parser.add_argument('--chr', type = str, required = True, help = "Chromosome ide
 parser.add_argument('--base-position', type = int, default = 0, help = "Base position to be added to the co-ordinates")
 parser.add_argument('--mangle-sample-names', action = 'store_true', help = "Replace unusual characters in sample names")
 parser.add_argument('--no-dels', action = 'store_true', help = "Do not use the <DEL> structural variant")
-parser.add_argument('--specific-types', nargs = '*', type = str, default = [], action = "store", help = "Instead of writing one haploid sample for each HLA type, output one haploid or diploid donor with the given HLA types")
-parser.add_argument('--omit-types', nargs = '*', type = str, default = [], action = "store", help = "Omit the given HLA types from the output")
+parser.add_argument('--specific-sequences', nargs = '*', type = str, default = [], action = "store", help = "Instead of writing one haploid sample for each input sequence, output one haploid or diploid donor using the given sequence identifier")
+parser.add_argument('--omit-sequences', nargs = '*', type = str, default = [], action = "store", help = "Omit the given sequences from the output")
 args = parser.parse_args()
 
-if 2 < len(args.specific_types):
+if 2 < len(args.specific_sequences):
 	print("At most two --specific-types arguments needed.", file = sys.stderr)
 	sys.exit(1)
 
@@ -121,13 +121,13 @@ gap_csum = list(itertools.accumulate(itertools.chain([0], gap_follows[:-1])))
 
 # Filter by --specific-types.
 join_gt_by = "\t"
-if 0 != len(args.specific_types):
+if 0 != len(args.specific_sequences):
 	join_gt_by = "|"
-	seq_idxs = list(find_seq_idxs(args.specific_types, seq_ids, True))
+	seq_idxs = list(find_seq_idxs(args.specific_sequences, seq_ids, True))
 	seq_ids = [seq_ids[idx] for idx in seq_idxs]
 	sequences = [sequences[idx] for idx in seq_idxs]
-elif 0 != len(args.omit_types):
-	seq_idxs = frozenset(find_seq_idxs(args.omit_types, seq_ids, False))
+elif 0 != len(args.omit_sequences):
+	seq_idxs = frozenset(find_seq_idxs(args.omit_sequences, seq_ids, False))
 	seq_ids = [seq_ids[i] for i, _ in enumerate(seq_ids) if not(i in seq_idxs)]
 	sequences = [sequences[i] for i, _ in enumerate(sequences) if not(i in seq_idxs)]
 
@@ -153,7 +153,7 @@ print("##fileformat=VCFv4.2")
 print('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">')
 if not args.no_dels:
 	print('##ALT=<ID=DEL,Description="Deletion">')
-print("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s" % ("\t".join(formatted_sample_names) if 0 == len(args.specific_types) else "SAMPLE1"))
+print("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s" % ("\t".join(formatted_sample_names) if 0 == len(args.specific_sequences) else "SAMPLE1"))
 
 # Range start, end.
 rs = 0
