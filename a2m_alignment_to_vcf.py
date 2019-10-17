@@ -5,7 +5,10 @@
 
 import argparse
 from Bio import SeqIO
+from collections import defaultdict
+from functools import reduce
 import itertools
+import random
 import sys
 
 
@@ -21,25 +24,19 @@ def format_ref(seq):
 	return str(seq).replace('-', '')
 
 
-def format_nonempty_alt(ref, seq):
+def format_nonempty_alt(seq, wildcard_handler):
 	"""Remove gaps and replace N with REF values."""
-	assert len(ref) == len(seq)
-	retval = list(seq)
-	for i, c in enumerate(ref):
-		if 'N' == retval[i]:
-			retval[i] = c
-		# Check for an added gap character.
-		if '-' == retval[i]:
-			retval[i] = ''
-	retval = "".join(retval)
+	l = list(seq)
+	wildcard_handler(l)
+	retval = "".join(l)
 	return retval
 
 
-def format_alt(ref, seq):
+def format_alt(seq, wildcard_handler):
 	"""Return <DEL> for empty ALTs, otherwise call format_nonempty_alt."""
 	for c in seq:
 		if '-' != c:
-			return format_nonempty_alt(ref, seq)
+			return format_nonempty_alt(seq, wildcard_handler)
 	return "<DEL>"
 
 
@@ -48,14 +45,48 @@ def format_sample_name(n):
 	return n.translate(str.maketrans("*:/", "_--"))
 
 
-def handle_range(base_pos, gap_csum, chrom, sequences, seq_ids, rs, re, join_gt_by):
+def wildcard_handler_ref(seq, ref):
+	assert len(ref) == len(seq)
+	for i, c in enumerate(ref):
+		if 'N' == seq[i]:
+			seq[i] = c
+		# Check for an added gap character.
+		if '-' == seq[i]:
+			seq[i] = ''
+
+
+def wildcard_handler_random(seq):
+	for i, c in enumerate(seq):
+		if '-' == c:
+			seq[i] = ''
+		elif 'N' == c:
+			seq[i] = random.choice(["A", "C", "G", "T"])
+
+
+def handle_range(base_pos, gap_csum, chrom, sequences, seq_ids, wildcard_handling, rs, re, join_gt_by):
 	ref, *rest = sequences
 	ref_part = ref[rs:re]
 	ref_part_formatted = format_ref(ref_part)
 	assert not 'N' in ref_part_formatted
 	
 	# Format each ALT.
-	alts = [format_alt(ref_part, seq[rs:re]) for seq in rest]
+	alts = None
+	if "reference" == wildcard_handling:
+		wildcard_handler = lambda x: wildcard_handler_ref(x, ref_part)
+		alts = [format_alt(seq[rs:re], wildcard_handler) for seq in rest]
+	elif "random" == wildcard_handling:
+		# Determine the unique ALTs for handling.
+		alt_occs = reduce(lambda dst, kv: dst[str(kv[1])].append(kv[0]) or dst, enumerate(map(lambda x: x[rs:re], rest)), defaultdict(list))
+		# Transform each key, combine unique values again.
+		alt_occs = reduce(lambda dst, kv: dst[format_alt(kv[0], wildcard_handler_random)].extend(kv[1]) or dst, alt_occs.items(), defaultdict(list))
+
+		# Calculate the resulting list size.
+		res_count = reduce(lambda dst, x: dst + len(x), alt_occs.values(), 0)
+		# Create the ALT list.
+		alts = [None] * res_count
+		for alt, idxs in alt_occs.items():
+			for i in idxs:
+				alts[i] = alt
 
 	# Get the unique values.
 	unique_alts_without_ref = frozenset(filter(lambda x: x != ref_part_formatted, alts))
@@ -97,11 +128,15 @@ parser.add_argument('--mangle-sample-names', action = 'store_true', help = "Repl
 parser.add_argument('--no-dels', action = 'store_true', help = "Do not use the <DEL> structural variant")
 parser.add_argument('--specific-sequences', nargs = '*', type = str, default = [], action = "store", help = "Instead of writing one haploid sample for each input sequence, output one haploid or diploid donor using the given sequence identifier")
 parser.add_argument('--omit-sequences', nargs = '*', type = str, default = [], action = "store", help = "Omit the given sequences from the output")
+parser.add_argument('--wildcard-handling', choices = ['reference', 'random'], default = 'reference', help = "Specify how N values are to be handled")
+parser.add_argument('--random-seed', type = int, default = 0, help = "Random seed (for use with --wildcard-handling=random)")
 args = parser.parse_args()
 
 if 2 < len(args.specific_sequences):
 	print("At most two --specific-types arguments needed.", file = sys.stderr)
 	sys.exit(1)
+
+random.seed(args.random_seed)
 
 seq_ids, sequences = get_sequences(args.input)
 
@@ -163,5 +198,5 @@ for i, next_is_gap in enumerate(gap_follows_in_any if args.no_dels else gap_foll
 	if next_is_gap:
 		continue
 	
-	handle_range(args.base_position, gap_csum, args.chr, sequences, seq_ids, rs, re, join_gt_by)
+	handle_range(args.base_position, gap_csum, args.chr, sequences, seq_ids, args.wildcard_handling, rs, re, join_gt_by)
 	rs = re
