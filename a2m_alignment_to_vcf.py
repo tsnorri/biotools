@@ -123,7 +123,7 @@ def find_seq_idxs(specific_sequences, seq_ids, include_first):
 parser = argparse.ArgumentParser(description = "Transform a multiple alignment in A2M format into variants. The first sequence needs to be the reference.")
 parser.add_argument('--input', type = argparse.FileType('r'), required = True, help = "Input MSA")
 parser.add_argument('--chr', type = str, required = True, help = "Chromosome identifier")
-parser.add_argument('--base-position', type = int, default = 0, help = "Base position to be added to the co-ordinates")
+parser.add_argument('--base-position', type = int, default = 1, help = "Base position to be added to the co-ordinates (default = 1)")
 parser.add_argument('--mangle-sample-names', action = 'store_true', help = "Replace unusual characters in sample names")
 parser.add_argument('--no-dels', action = 'store_true', help = "Do not use the <DEL> structural variant")
 parser.add_argument('--specific-sequences', nargs = '*', type = str, default = [], action = "store", help = "Instead of writing one haploid sample for each input sequence, output one haploid or diploid donor using the given sequence identifier")
