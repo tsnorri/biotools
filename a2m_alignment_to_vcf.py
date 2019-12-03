@@ -63,7 +63,7 @@ def wildcard_handler_random(seq):
 			seq[i] = random.choice(["A", "C", "G", "T"])
 
 
-def handle_range(base_pos, gap_csum, chrom, sequences, seq_ids, wildcard_handling, rs, re, join_gt_by):
+def handle_range(base_pos, gap_csum, chrom, sequences, seq_ids, wildcard_handling, rs, re, join_gt_by, dst_file):
 	ref, *rest = sequences
 	ref_part = ref[rs:re]
 	ref_part_formatted = format_ref(ref_part)
@@ -103,7 +103,7 @@ def handle_range(base_pos, gap_csum, chrom, sequences, seq_ids, wildcard_handlin
 	alt_idxs[ref_part_formatted] = 0
 
 	# CHROM POS ID REF ALT QUAL FILTER INFO FORMAT
-	print("%s\t%d\t.\t%s\t%s\t.\tPASS\t.\tGT\t%s" % (chrom, base_pos + rs - gap_csum[rs], ref_part_formatted, ",".join(alts_in_order), join_gt_by.join([str(alt_idxs[alt]) for alt in alts])))
+	print("%s\t%d\t.\t%s\t%s\t.\tPASS\t.\tGT\t%s" % (chrom, base_pos + rs - gap_csum[rs], ref_part_formatted, ",".join(alts_in_order), join_gt_by.join([str(alt_idxs[alt]) for alt in alts])), file = dst_file)
 
 
 def find_seq_idxs(specific_sequences, seq_ids, include_first):
@@ -116,87 +116,94 @@ def find_seq_idxs(specific_sequences, seq_ids, include_first):
 		try:
 			yield 1 + seq_ids[1:].index(seq_id)
 		except ValueError:
+			# FIXME: raise instead of calling sys.exit.
 			print("Sequence with id %s not found." % seq_id, file = sys.stderr)
 			sys.exit(1)
 
+def process_sequences(sequences, seq_ids, dst_file, chr_id, base_position = 1, wildcard_handling = "reference", specific_sequences = [], omit_sequences = [], mangle_sample_names = False, no_dels = False):
+	# Check for gap characters in the first column.
+	for s in sequences:
+		if '-' == s[0]:
+			# FIXME: raise instead of calling sys.exit.
+			print("Found a gap character in the first column.", file = sys.stderr)
+			sys.exit(1)
+		
+	# Make a boolean vector of positions that are followed by a gap.
+	gap_follows = len(sequences[0]) * [False]
+	for i, c in enumerate(sequences[0][1:]):
+		gap_follows[i] = ('-' == c)
 
-parser = argparse.ArgumentParser(description = "Transform a multiple alignment in A2M format into variants. The first sequence needs to be the reference.")
-parser.add_argument('--input', type = argparse.FileType('r'), required = True, help = "Input MSA")
-parser.add_argument('--chr', type = str, required = True, help = "Chromosome identifier")
-parser.add_argument('--base-position', type = int, default = 1, help = "Base position to be added to the co-ordinates (default = 1)")
-parser.add_argument('--mangle-sample-names', action = 'store_true', help = "Replace unusual characters in sample names")
-parser.add_argument('--no-dels', action = 'store_true', help = "Do not use the <DEL> structural variant")
-parser.add_argument('--specific-sequences', nargs = '*', type = str, default = [], action = "store", help = "Instead of writing one haploid sample for each input sequence, output one haploid or diploid donor using the given sequence identifier")
-parser.add_argument('--omit-sequences', nargs = '*', type = str, default = [], action = "store", help = "Omit the given sequences from the output")
-parser.add_argument('--wildcard-handling', choices = ['reference', 'random'], default = 'reference', help = "Specify how N values are to be handled")
-parser.add_argument('--random-seed', type = int, default = 0, help = "Random seed (for use with --wildcard-handling=random)")
-args = parser.parse_args()
+	# Count the gaps up to each aligned position.
+	gap_csum = list(itertools.accumulate(itertools.chain([0], gap_follows[:-1])))
 
-if 2 < len(args.specific_sequences):
-	print("At most two --specific-types arguments needed.", file = sys.stderr)
-	sys.exit(1)
+	# Filter by --specific-types.
+	join_gt_by = "\t"
+	if 0 != len(specific_sequences):
+		join_gt_by = "|"
+		seq_idxs = list(find_seq_idxs(specific_sequences, seq_ids, True))
+		seq_ids = [seq_ids[idx] for idx in seq_idxs]
+		sequences = [sequences[idx] for idx in seq_idxs]
+	elif 0 != len(omit_sequences):
+		seq_idxs = frozenset(find_seq_idxs(omit_sequences, seq_ids, False))
+		seq_ids = [seq_ids[i] for i, _ in enumerate(seq_ids) if not(i in seq_idxs)]
+		sequences = [sequences[i] for i, _ in enumerate(sequences) if not(i in seq_idxs)]
 
-random.seed(args.random_seed)
+	# Make a boolean vector of positions that are followed by a gap in any sequence.
+	gap_follows_in_any = None
+	if no_dels:
+		gap_follows_in_any = len(sequences[0]) * [False]
+		for i in range(len(sequences[0]) - 1):
+			for s in sequences:
+				if '-' == s[1 + i]:
+					gap_follows_in_any[i] = True
+					break
 
-seq_ids, sequences = get_sequences(args.input)
+	# Output the VCF header.
+	formatted_sample_names = None
+	if mangle_sample_names:
+		formatted_sample_names = [format_sample_name(x) for x in seq_ids[1:]]
+		assert len(formatted_sample_names) == len(frozenset(formatted_sample_names))
+	else:
+		formatted_sample_names = seq_ids[1:]
 
-# Check for gap characters in the first column.
-for s in sequences:
-	if '-' == s[0]:
-		print("Found a gap character in the first column.", file = sys.stderr)
+	print("##fileformat=VCFv4.2", file = dst_file)
+	print('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">', file = dst_file)
+	if not no_dels:
+		print('##ALT=<ID=DEL,Description="Deletion">', file = dst_file)
+	print("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s" % ("\t".join(formatted_sample_names) if 0 == len(specific_sequences) else "SAMPLE1"), file = dst_file)
+
+	# Range start, end.
+	rs = 0
+	re = 0
+	for i, next_is_gap in enumerate(gap_follows_in_any if no_dels else gap_follows):
+		re = i + 1
+		if next_is_gap:
+			continue
+		
+		handle_range(base_position, gap_csum, chr_id, sequences, seq_ids, wildcard_handling, rs, re, join_gt_by, dst_file)
+		rs = re
+
+
+if __name__ == "__main__":
+	parser = argparse.ArgumentParser(description = "Transform a multiple alignment in A2M format into variants. The first sequence needs to be the reference.")
+	parser.add_argument('--input', type = argparse.FileType('r'), required = True, help = "Input MSA")
+	parser.add_argument('--chr', type = str, required = True, help = "Chromosome identifier")
+	parser.add_argument('--base-position', type = int, default = 1, help = "Base position to be added to the co-ordinates (default = 1)")
+	parser.add_argument('--mangle-sample-names', action = 'store_true', help = "Replace unusual characters in sample names")
+	parser.add_argument('--no-dels', action = 'store_true', help = "Do not use the <DEL> structural variant")
+	parser.add_argument('--specific-sequences', nargs = '*', type = str, default = [], action = "store", help = "Instead of writing one haploid sample for each input sequence, output one haploid or diploid donor using the given sequence identifier")
+	parser.add_argument('--omit-sequences', nargs = '*', type = str, default = [], action = "store", help = "Omit the given sequences from the output")
+	parser.add_argument('--wildcard-handling', choices = ['reference', 'random'], default = 'reference', help = "Specify how N values are to be handled")
+	parser.add_argument('--random-seed', type = int, default = 0, help = "Random seed (for use with --wildcard-handling=random)")
+	args = parser.parse_args()
+
+	if 2 < len(args.specific_sequences):
+		print("At most two --specific-types arguments needed.", file = sys.stderr)
 		sys.exit(1)
-	
-# Make a boolean vector of positions that are followed by a gap.
-gap_follows = len(sequences[0]) * [False]
-for i, c in enumerate(sequences[0][1:]):
-	gap_follows[i] = ('-' == c)
 
-# Count the gaps up to each aligned position.
-gap_csum = list(itertools.accumulate(itertools.chain([0], gap_follows[:-1])))
+	random.seed(args.random_seed)
 
-# Filter by --specific-types.
-join_gt_by = "\t"
-if 0 != len(args.specific_sequences):
-	join_gt_by = "|"
-	seq_idxs = list(find_seq_idxs(args.specific_sequences, seq_ids, True))
-	seq_ids = [seq_ids[idx] for idx in seq_idxs]
-	sequences = [sequences[idx] for idx in seq_idxs]
-elif 0 != len(args.omit_sequences):
-	seq_idxs = frozenset(find_seq_idxs(args.omit_sequences, seq_ids, False))
-	seq_ids = [seq_ids[i] for i, _ in enumerate(seq_ids) if not(i in seq_idxs)]
-	sequences = [sequences[i] for i, _ in enumerate(sequences) if not(i in seq_idxs)]
+	seq_ids, sequences = get_sequences(args.input)
+	# sequences, seq_ids, dst_file, chr_id, base_position, wildcard_handling, specific_sequences, omit_sequences, mangle_sample_names, no_dels
+	process_sequences(sequences, seq_ids, sys.stdout, args.chr, args.base_position, args.wildcard_handling, args.specific_sequences, args.omit_sequences, args.mangle_sample_names, args.no_dels)
 
-# Make a boolean vector of positions that are followed by a gap in any sequence.
-gap_follows_in_any = None
-if args.no_dels:
-	gap_follows_in_any = len(sequences[0]) * [False]
-	for i in range(len(sequences[0]) - 1):
-		for s in sequences:
-			if '-' == s[1 + i]:
-				gap_follows_in_any[i] = True
-				break
-
-# Output the VCF header.
-formatted_sample_names = None
-if args.mangle_sample_names:
-	formatted_sample_names = [format_sample_name(x) for x in seq_ids[1:]]
-	assert len(formatted_sample_names) == len(frozenset(formatted_sample_names))
-else:
-	formatted_sample_names = seq_ids[1:]
-
-print("##fileformat=VCFv4.2")
-print('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">')
-if not args.no_dels:
-	print('##ALT=<ID=DEL,Description="Deletion">')
-print("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s" % ("\t".join(formatted_sample_names) if 0 == len(args.specific_sequences) else "SAMPLE1"))
-
-# Range start, end.
-rs = 0
-re = 0
-for i, next_is_gap in enumerate(gap_follows_in_any if args.no_dels else gap_follows):
-	re = i + 1
-	if next_is_gap:
-		continue
-	
-	handle_range(args.base_position, gap_csum, args.chr, sequences, seq_ids, args.wildcard_handling, rs, re, join_gt_by)
-	rs = re
