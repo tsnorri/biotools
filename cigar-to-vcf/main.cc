@@ -3,6 +3,7 @@
  * This code is licensed under MIT license (see LICENSE for details).
  */
 
+#include <cassert>
 #include <fstream>
 #include <iostream>
 #include <vector>
