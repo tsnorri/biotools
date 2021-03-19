@@ -13,9 +13,10 @@ from Bio import SeqIO
 #	1.	Tab-separated file that contains the following:
 #		Gene name (one of HLA-A, -B, -C, -DQA1, -DQB1, -DRB1)
 #		Allele identifier
+#		HLA type identifier
 #		Exon co-ordinates from gene start as zero-based half-open intervals formatted as follows:
 #			exon_number_1:start_pos-end_pos,exon_number_2:start_pos-end_pos
-#		Sequence
+#		Exon sequence
 #	2.	FASTA
 
 
@@ -68,6 +69,11 @@ def handle_record(rec, gene_name, exon_numbers, output_fasta, exons_only, separa
 			exon_seqs[num] = str(subseq)
 
 	exon_descs_formatted = ["%d:%d-%d" % (num, start, end) for (num, start, end) in exon_descs]
+
+	# Attempt to parse the HLA type_name.
+	desc_parts = rec.description.split(",")
+	hla_type_parts = desc_parts[0].split("-")
+	hla_type = hla_type_parts[1]
 	
 	if separate_exons:
 		for (exon_number, exon_seq) in exon_seqs.items():
@@ -81,7 +87,7 @@ def handle_record(rec, gene_name, exon_numbers, output_fasta, exons_only, separa
 					print(">%s\t%s" % (rec.id, len(exon_seq)), file = dst_file)
 					print(exon_seq, file = dst_file)
 				else:
-					print("%s\t%s\t%s" % (rec.id, len(exon_seq), exon_seq), file = dst_file)
+					print("%s\t%s\t%s\t%s" % (rec.id, hla_type, len(exon_seq), exon_seq), file = dst_file)
 	else:
 		if exons_only:
 			seq = "".join(exon_seqs.values())
@@ -93,7 +99,7 @@ def handle_record(rec, gene_name, exon_numbers, output_fasta, exons_only, separa
 				print(">%s\t%s\t%s\t%s" % (gene_name, rec.id, ",".join(exon_descs_formatted), len(seq)), file = dst_file)
 				print(seq, file = dst_file)
 			else:
-				print("%s\t%s\t%s\t%s\t%s" % (gene_name, rec.id, ",".join(exon_descs_formatted), len(seq), seq), file = dst_file)
+				print("%s\t%s\t%s\t%s\t%s\t%s" % (gene_name, rec.id, hla_type, ",".join(exon_descs_formatted), len(seq), seq), file = dst_file)
 
 
 # Read the gene names if needed.
