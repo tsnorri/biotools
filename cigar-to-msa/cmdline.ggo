@@ -1,0 +1,12 @@
+# Copyright (c) 2021 Tuukka Norri
+# This code is licensed under MIT license (see LICENSE for details).
+
+package		"cigar-to-msa"
+version		"0.1"
+purpose		"Produces a multiple sequence alignment from two sequences and a CIGAR string."
+usage		"cigar-to-msa --query=... --target=... --cigar=..."
+description	"The aligned sequences will be written to stdout as A2M."
+
+option		"query"		q	"Query sequence as plain text"		string	typestr = "path"	required
+option		"reference"	r	"Reference sequence as plain text"	string	typestr = "path"	required
+option		"cigar"		c	"CIGAR sequence as plain text"		string	typestr = "path"	required

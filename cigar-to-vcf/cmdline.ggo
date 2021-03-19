@@ -1,0 +1,14 @@
+# Copyright (c) 2021 Tuukka Norri
+# This code is licensed under MIT license (see LICENSE for details).
+
+package		"cigar-to-vcf"
+version		"0.1"
+purpose		"Produces a VCF from two sequences and a CIGAR string."
+usage		"cigar-to-vcf --query=... --target=... --cigar=..."
+description	"The VCF will be written to stdout."
+
+option		"query"			q	"Query sequence as plain text"		string	typestr = "path"	required
+option		"reference"		r	"Reference sequence as plain text"	string	typestr = "path"	required
+option		"cigar"			c	"CIGAR sequence as plain text"		string	typestr = "path"	required
+option		"chr-id"		C	"Chromosome identifier"				string						required
+option		"sample-name"	s	"Output sample name"				string	default = "SAMPLE1"	optional
